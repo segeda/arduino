@@ -1,10 +1,6 @@
-#include <Process.h>
 #include <Bridge.h>
 #include <BridgeClient.h>
 
-Process date;
-int32_t whenTime;
-int32_t lastTime = -1;
 BridgeClient client;
 
 #include <BlynkSimpleYun.h>
@@ -12,7 +8,7 @@ BridgeClient client;
 #define VPIN_HUMIDITY V1
 #define VPIN_TEMP V2
 
-char auth[] = "<AUTH-KEY>"; 
+char auth[] = "<BLYNK-AUTH-KEY>";
 
 #include <SimpleTimer.h>
 
@@ -33,11 +29,13 @@ DHT dht(DHTPIN, DHTTYPE);
 #define AIO_SERVER      "<MQTT-SERVER>"
 #define AIO_SERVERPORT  1883
 
+#define ROOT_TOPIC "arduino/yun"
+
 Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT);
-Adafruit_MQTT_Publish when = Adafruit_MQTT_Publish(&mqtt, "arduino/yun/time");
-Adafruit_MQTT_Publish humidity = Adafruit_MQTT_Publish(&mqtt, "arduino/yun/humidity");
-Adafruit_MQTT_Publish temperature = Adafruit_MQTT_Publish(&mqtt, "arduino/yun/temperature");
-Adafruit_MQTT_Publish heatIndex = Adafruit_MQTT_Publish(&mqtt, "arduino/yun/heatIndex");
+Adafruit_MQTT_Publish yun = Adafruit_MQTT_Publish(&mqtt, ROOT_TOPIC);
+Adafruit_MQTT_Publish humidity = Adafruit_MQTT_Publish(&mqtt, ROOT_TOPIC "/humidity");
+Adafruit_MQTT_Publish temperature = Adafruit_MQTT_Publish(&mqtt, ROOT_TOPIC "/temperature");
+Adafruit_MQTT_Publish heatIndex = Adafruit_MQTT_Publish(&mqtt, ROOT_TOPIC "/heatIndex");
 
 void setup()
 {
@@ -45,14 +43,6 @@ void setup()
   delay(10);
   Blynk.begin(auth);
   Bridge.begin();
-
-  // run an initial date process. Should return:
-  // seconds since 1970-01-01 00:00:00 UTC.
-  if (!date.running()) {
-    date.begin("date");
-    date.addParameter("+%s");
-    date.run();
-  }
 
   // Setup a function to be called every second
   timer.setInterval(2000L, sendValues);
@@ -67,32 +57,26 @@ void sendValues()
     return;
   }
 
-  if (lastTime != whenTime) { // if a second has passed
-    when.publish(whenTime);
-
-    // restart the date process:
-    if (!date.running()) {
-      date.begin("date");
-      date.addParameter("+%s");
-      date.run();
-    }
-  }
-  
   float hic = dht.computeHeatIndex(t, h, false);
   Blynk.virtualWrite(1, (int)h);
   Blynk.virtualWrite(2, (int)t);
   Blynk.virtualWrite(3, hic);
 
+  String json = "{\"humidity\":";
+  json += (int32_t)h;
+  json += ",\"temperature\":";
+  json += (int32_t)t;
+  json += ",\"heatIndex\":";
+  json += hic;
+  json += "}";
+  int json_length = json.length() + 1;
+  char data[json_length];
+  json.toCharArray(data, json_length);
+
+  yun.publish(data);
   humidity.publish((int32_t)h);
   temperature.publish((int32_t)t);
   heatIndex.publish(hic);
-
-  //if there's a result from the date process, parse it:
-  while (date.available() > 0) {
-    String timeString = date.readString();
-    lastTime = whenTime;
-    whenTime = timeString.toInt();
-  }
 }
 
 void loop()
