@@ -44,8 +44,7 @@ void setup()
   Blynk.begin(auth);
   Bridge.begin();
 
-  // Setup a function to be called every second
-  timer.setInterval(2000L, sendValues);
+  timer.setInterval(10 * 1000, sendValues); //every 10 seconds
 }
 
 void sendValues()
@@ -102,6 +101,6 @@ void MQTT_connect() {
 
   while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
     mqtt.disconnect();
-    delay(5000);  // wait 5 seconds
+    delay(5 * 1000);  // wait 5 seconds
   }
 }
