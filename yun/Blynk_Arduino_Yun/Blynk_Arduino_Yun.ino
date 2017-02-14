@@ -55,25 +55,25 @@ void sendValues()
   int payload_length = payload.length() + 1;
   char payload_data[payload_length];
   payload.toCharArray(payload_data, payload_length);
-  pubSubClient.publish(ROOT_TOPIC, payload_data);
+  pubSubClient.publish(ROOT_TOPIC, payload_data, true);
 
   String humidity = String((int)h);
   int humidity_length = humidity.length() + 1;
   char humidity_data[humidity_length];
   humidity.toCharArray(humidity_data, humidity_length);
-  pubSubClient.publish(ROOT_TOPIC "/humidity", humidity_data);
+  pubSubClient.publish(ROOT_TOPIC "/humidity", humidity_data, true);
 
   String temperature = String((int)t);
   int temperature_length = temperature.length() + 1;
   char temperature_data[temperature_length];
   temperature.toCharArray(temperature_data, temperature_length);
-  pubSubClient.publish(ROOT_TOPIC "/temperature", temperature_data);
+  pubSubClient.publish(ROOT_TOPIC "/temperature", temperature_data, true);
 
   String heatIndex = String(hic);
   int heatIndex_length = heatIndex.length() + 1;
   char heatIndex_data[heatIndex_length];
   heatIndex.toCharArray(heatIndex_data, heatIndex_length);
-  pubSubClient.publish(ROOT_TOPIC "/heatIndex", heatIndex_data);
+  pubSubClient.publish(ROOT_TOPIC "/heatIndex", heatIndex_data, true);
 }
 
 void loop()
