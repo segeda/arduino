@@ -1,41 +1,23 @@
 #include <Bridge.h>
 #include <BridgeClient.h>
-
-BridgeClient client;
-
+#include <PubSubClient.h>
 #include <BlynkSimpleYun.h>
-
-#define VPIN_HUMIDITY V1
-#define VPIN_TEMP V2
-
-char auth[] = "<BLYNK-AUTH-KEY>";
-
 #include <SimpleTimer.h>
-
-SimpleTimer timer;
-
 #include <DHT.h>
 #include <DHT_U.h>
 #include <Adafruit_Sensor.h>
 
+#define VPIN_HUMIDITY V1
+#define VPIN_TEMP V2
 #define DHTPIN 2
 #define DHTTYPE DHT11
-
-DHT dht(DHTPIN, DHTTYPE);
-
-#include "Adafruit_MQTT.h"
-#include "Adafruit_MQTT_Client.h"
-
-#define AIO_SERVER      "<MQTT-SERVER>"
-#define AIO_SERVERPORT  1883
-
 #define ROOT_TOPIC "arduino/yun"
 
-Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT);
-Adafruit_MQTT_Publish yun = Adafruit_MQTT_Publish(&mqtt, ROOT_TOPIC);
-Adafruit_MQTT_Publish humidity = Adafruit_MQTT_Publish(&mqtt, ROOT_TOPIC "/humidity");
-Adafruit_MQTT_Publish temperature = Adafruit_MQTT_Publish(&mqtt, ROOT_TOPIC "/temperature");
-Adafruit_MQTT_Publish heatIndex = Adafruit_MQTT_Publish(&mqtt, ROOT_TOPIC "/heatIndex");
+char auth[] = "<BLYNK-AUTH-KEY>";
+SimpleTimer timer;
+DHT dht(DHTPIN, DHTTYPE);
+BridgeClient client;
+PubSubClient pubSubClient(client);
 
 void setup()
 {
@@ -43,6 +25,8 @@ void setup()
   delay(10);
   Blynk.begin(auth);
   Bridge.begin();
+
+  pubSubClient.setServer("<MQTT-SERVER>", 1883);
 
   timer.setInterval(10 * 1000, sendValues); //every 10 seconds
 }
@@ -61,46 +45,55 @@ void sendValues()
   Blynk.virtualWrite(2, (int)t);
   Blynk.virtualWrite(3, hic);
 
-  String json = "{\"humidity\":";
-  json += (int32_t)h;
-  json += ",\"temperature\":";
-  json += (int32_t)t;
-  json += ",\"heatIndex\":";
-  json += hic;
-  json += "}";
-  int json_length = json.length() + 1;
-  char data[json_length];
-  json.toCharArray(data, json_length);
+  String payload = "{\"humidity\":";
+  payload += (int)h;
+  payload += ",\"temperature\":";
+  payload += (int)t;
+  payload += ",\"heatIndex\":";
+  payload += hic;
+  payload += "}";
+  int payload_length = payload.length() + 1;
+  char payload_data[payload_length];
+  payload.toCharArray(payload_data, payload_length);
+  pubSubClient.publish(ROOT_TOPIC, payload_data);
 
-  yun.publish(data);
-  humidity.publish((int32_t)h);
-  temperature.publish((int32_t)t);
-  heatIndex.publish(hic);
+  String humidity = String((int)h);
+  int humidity_length = humidity.length() + 1;
+  char humidity_data[humidity_length];
+  humidity.toCharArray(humidity_data, humidity_length);
+  pubSubClient.publish(ROOT_TOPIC "/humidity", humidity_data);
+
+  String temperature = String((int)t);
+  int temperature_length = temperature.length() + 1;
+  char temperature_data[temperature_length];
+  temperature.toCharArray(temperature_data, temperature_length);
+  pubSubClient.publish(ROOT_TOPIC "/temperature", temperature_data);
+
+  String heatIndex = String(hic);
+  int heatIndex_length = heatIndex.length() + 1;
+  char heatIndex_data[heatIndex_length];
+  heatIndex.toCharArray(heatIndex_data, heatIndex_length);
+  pubSubClient.publish(ROOT_TOPIC "/heatIndex", heatIndex_data);
 }
 
 void loop()
 {
-  // Ensure the connection to the MQTT server is alive (this will make the first
-  // connection and automatically reconnect when disconnected).  See the MQTT_connect
-  // function definition further below.
-  MQTT_connect();
+  if (!pubSubClient.connected()) {
+    reconnect();
+  }
+  pubSubClient.loop();
 
   Blynk.run();
   timer.run();
 }
 
-// Function to connect and reconnect as necessary to the MQTT server.
-// Should be called in the loop function and it will take care if connecting.
-void MQTT_connect() {
-  int8_t ret;
-
-  // Stop if already connected.
-  if (mqtt.connected()) {
-    return;
-  }
-
-  while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
-    mqtt.disconnect();
-    delay(5 * 1000);  // wait 5 seconds
+void reconnect() {
+  // Loop until we're reconnected
+  while (!pubSubClient.connected()) {
+    // Attempt to connect
+    if (!pubSubClient.connect("arduinoYun")) {
+      // Wait 5 seconds before retrying
+      delay(5 * 1000);
+    }
   }
 }
